@@ -5,6 +5,8 @@ import numpy as np
 import pickle
 import ast
 import logging
+from fastapi.middleware.cors import CORSMiddleware
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -42,6 +44,24 @@ nutritional_data = nutritional_data.dropna(subset=numeric_columns)
 
 # Define the FastAPI app
 app = FastAPI()
+
+
+# Configure CORS
+origins = [
+    "http://localhost",
+    "http://localhost:8080",
+    "http://yourdomain.com",  # Replace with your front-end domain
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 
 # Define the request body model
 class UserProfile(BaseModel):
