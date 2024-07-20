@@ -60,8 +60,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-
 # Define the request body model
 class UserProfile(BaseModel):
     Disliked_Foods: str
