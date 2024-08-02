@@ -48,9 +48,10 @@ app = FastAPI()
 
 # Configure CORS
 origins = [
-    "http://localhost",
+    "http://localhost:3000",
     "http://localhost:8080",
-    "https://health-care-app-zeta.vercel.app/"# Replace with your front-end domain
+    "https://health-care-app-zeta.vercel.app/approach",
+    "https://health-care-app-zeta.vercel.app"
 ]
 
 app.add_middleware(
