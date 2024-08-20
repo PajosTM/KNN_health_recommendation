@@ -5,8 +5,8 @@ import numpy as np
 import pickle
 import ast
 import logging
-from fastapi.middleware.cors import CORSMiddleware
 
+from sklearn.neighbors import NearestNeighbors
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -46,103 +46,98 @@ nutritional_data = nutritional_data.dropna(subset=numeric_columns)
 app = FastAPI()
 
 
-# Configure CORS
-origins = [
-    "http://localhost:3000",
-    "http://localhost:8080",
-    "https://health-care-app-zeta.vercel.app/approach",
-    "https://health-care-app-zeta.vercel.app"
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Define the request body model
 class UserProfile(BaseModel):
     Disliked_Foods: str
     Health_Objectives: str
 
+
 def get_preferred_foods(user_profile, main_df):
-    disliked_foods = ast.literal_eval(user_profile.Disliked_Foods)
-    logger.info("Disliked foods: %s", disliked_foods)
-    logger.info("Food and Serving column values: %s", main_df['Food and Serving'].tolist())
+    try:
+        disliked_foods = ast.literal_eval(user_profile['Disliked Foods'])
+    except (ValueError, SyntaxError) as e:
+        logger.error("Error parsing Disliked_Foods: %s", str(e))
+        return main_df  # Fallback to returning the full DataFrame
+
+    # Normalize the strings for comparison
+    disliked_foods = [food.lower().strip() for food in disliked_foods]
+    main_df['Food and Serving'] = main_df['Food and Serving'].str.lower().str.strip()
 
     preferred_foods = main_df[~main_df['Food and Serving'].isin(disliked_foods)]
-    logger.info("Preferred foods after filtering disliked: %s", preferred_foods)
+    if user_profile['Health Objectives'] == 'Digestive Issues':
+        preferred_foods = preferred_foods[preferred_foods['Dietary Fiber'] > 3]
+    elif user_profile['Health Objectives'] == 'High blood pressure':
+        preferred_foods = preferred_foods[preferred_foods['Sodium'] > 50]
+    elif user_profile['Health Objectives'] == 'Heart Health':
+        preferred_foods = preferred_foods[(preferred_foods['Potassium'] > 300) & (preferred_foods['Total Fat'] > 1) ]
+    elif user_profile['Health Objectives'] == 'Weight Loss':
+        preferred_foods = preferred_foods[(preferred_foods['Calories'] > 1) & (preferred_foods['Total Fat'] > 0)]
+    elif user_profile['Health Objectives'] == 'Skin Health':
+        preferred_foods = preferred_foods[(preferred_foods['Vitamin A'] > 50) & (preferred_foods['Vitamin C'] > 50) ]
+    elif user_profile['Health Objectives'] == 'Immune system support':
+        preferred_foods = preferred_foods[(preferred_foods['Vitamin A'] > 50) & (preferred_foods['Vitamin C'] > 50)]
+    elif user_profile['Health Objectives'] == 'Bone Health':
+        preferred_foods = preferred_foods[preferred_foods['Calcium'] > 4]
+    elif user_profile['Health Objectives'] == 'Eye Health':
+        preferred_foods = preferred_foods[preferred_foods['Vitamin A'] > 150]
+    elif user_profile['Health Objectives'] == 'Joint Health':
+        preferred_foods = preferred_foods[preferred_foods['Vitamin C'] > 100]
+    elif user_profile['Health Objectives'] == 'Brain Health':
+        preferred_foods = preferred_foods[preferred_foods['Vitamin C'] > 200]
+    elif user_profile['Health Objectives'] == 'Muscle Gain':
+        preferred_foods = preferred_foods[preferred_foods['Protein'] > 2]
 
-    if preferred_foods.empty:
-        # Fallback: If preferred foods is empty, return the original DataFrame
-        logger.warning("Preferred foods is empty after filtering. Returning the original DataFrame as fallback.")
-        return main_df
     return preferred_foods
 
-def adjust_query_point(query_point, health_objective):
-    if health_objective == 'Digestive Issues':
-        query_point[0, numeric_columns.index('Dietary Fiber')] *= 2
-    elif health_objective == 'High blood pressure':
-        query_point[0, numeric_columns.index('Sodium')] *= 0.5
-    elif health_objective == 'Heart Health':
-        query_point[0, numeric_columns.index('Total Fat')] *= 0.5
-        query_point[0, numeric_columns.index('Potassium')] *= 2
-    elif health_objective == 'Weight Management':
-        query_point[0, numeric_columns.index('Calories')] *= 0.5
-        query_point[0, numeric_columns.index('Total Fat')] *= 0.5
-    elif health_objective == 'Skin Health':
-        query_point[0, numeric_columns.index('Vitamin A')] *= 2
-        query_point[0, numeric_columns.index('Vitamin C')] *= 2
-    elif health_objective == 'Immune system support':
-        query_point[0, numeric_columns.index('Vitamin C')] *= 2
-        query_point[0, numeric_columns.index('Vitamin A')] *= 2
-    elif health_objective == 'Bone Health':
-        query_point[0, numeric_columns.index('Calcium')] *= 2
-    elif health_objective == 'Eye Health':
-        query_point[0, numeric_columns.index('Vitamin A')] *= 2
-    elif health_objective == 'Joint Health':
-        query_point[0, numeric_columns.index('Vitamin C')] *= 2
-    elif health_objective == 'Brain Health':
-        query_point[0, numeric_columns.index('Vitamin C')] *= 2
-    elif health_objective == 'Muscle Gain':
-        query_point[0, numeric_columns.index('Protein')] *= 2
-    logger.info("Query point after adjustment for %s: %s", health_objective, query_point)
-    return query_point
 
-def recommend_foods(user_profile, main_df, knn_model, scaler):
+def recommend_foods(user_profile, main_df, scaler):
+    # Get the preferred foods based on the user's profile
     preferred_foods = get_preferred_foods(user_profile, main_df)
-    preferred_features = preferred_foods.drop(columns=['Food and Serving'])
+    if preferred_foods.empty:
+        return []
 
-    if preferred_features.empty:
-        return pd.DataFrame(columns=main_df.columns)  # Return an empty DataFrame with the same columns
+    # Keep the original indices of the preferred foods
+    original_indices = preferred_foods.index
+    print("Original Indices:", original_indices)
+    try:
+        knn = NearestNeighbors(n_neighbors=4, metric='euclidean')
+        # Drop non-numeric columns and scale the features
+        preferred_features = preferred_foods.drop(columns=['Food and Serving'])
+        scaled_preferred_features = scaler.transform(preferred_features)
+    # Use the mean of the preferred features as the query point
+        query_point = scaled_preferred_features.mean(axis=0).reshape(1, -1)
+        print("Query Point:", query_point)
+        knn.fit(scaled_preferred_features)
+        # Get the nearest neighbors
+        distances, indices = knn.kneighbors(query_point)
+        print("KNN Returned Indices:", indices)
 
-    scaled_preferred_features = scaler.transform(preferred_features)
-    logger.info("Scaled preferred features: %s", scaled_preferred_features)
+        # Convert KNN indices (relative) to original DataFrame indices
+        recommended_indices = original_indices[indices[0]]
+        print("Mapped Recommended Indices:", recommended_indices)
 
-    # Adjust the query point based on health objectives
-    health_objective = user_profile.Health_Objectives
-    query_point = scaled_preferred_features.mean(axis=0).reshape(1, -1)
-    query_point = adjust_query_point(query_point, health_objective)
-
-    distances, indices = knn_model.kneighbors(query_point)
-
-    recommended_foods = preferred_foods.iloc[indices[0]]
+        # Retrieve the recommended foods from the original DataFrame using these indices
+        recommended_foods = main_df.loc[recommended_indices]
+    except IndexError as e:
+        print("IndexError:", str(e))
+        return pd.DataFrame()  # Return an empty DataFrame if there's an error
 
     return recommended_foods
+
 
 @app.post("/recommended")
 def recommend(user_profile: UserProfile):
     try:
         logger.info("Received request: %s", user_profile)
-        recommendations = recommend_foods(user_profile, nutritional_data, knn, scaler)
+        recommendations = recommend_foods(user_profile, nutritional_data, scaler)
         logger.info("Recommendations: %s", recommendations)
         return {"recommended_foods": recommendations['Food and Serving'].tolist()}
     except Exception as e:
         logger.error("Error in recommendation: %s", str(e))
         return {"error": str(e)}
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="127.0.0.1", port=8001)
