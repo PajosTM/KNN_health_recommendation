@@ -54,7 +54,7 @@ class UserProfile(BaseModel):
 
 def get_preferred_foods(user_profile, main_df):
     try:
-        disliked_foods = ast.literal_eval(user_profile.Disliked_Foods)
+        disliked_foods = ast.literal_eval(user_profile.Disliked_Foods)  # Access directly with dot notation
     except (ValueError, SyntaxError) as e:
         logger.error("Error parsing Disliked_Foods: %s", str(e))
         return main_df  # Fallback to returning the full DataFrame
@@ -64,30 +64,34 @@ def get_preferred_foods(user_profile, main_df):
     main_df['Food and Serving'] = main_df['Food and Serving'].str.lower().str.strip()
 
     preferred_foods = main_df[~main_df['Food and Serving'].isin(disliked_foods)]
-    if user_profile.Health_Objectives == 'Digestive Issues':
+
+    # Accessing the health objectives directly from the profile
+    health_objective = user_profile.Health_Objectives
+    if health_objective == 'Digestive Issues':
         preferred_foods = preferred_foods[preferred_foods['Dietary Fiber'] > 3]
-    elif user_profile.Health_Objectives == 'High blood pressure':
+    elif health_objective == 'High blood pressure':
         preferred_foods = preferred_foods[preferred_foods['Sodium'] > 50]
-    elif user_profile.Health_Objectives == 'Heart Health':
+    elif health_objective == 'Heart Health':
         preferred_foods = preferred_foods[(preferred_foods['Potassium'] > 300) & (preferred_foods['Total Fat'] > 1)]
-    elif user_profile.Health_Objectives == 'Weight Loss':
+    elif health_objective == 'Weight Loss':
         preferred_foods = preferred_foods[(preferred_foods['Calories'] > 1) & (preferred_foods['Total Fat'] > 0)]
-    elif user_profile.Health_Objectives == 'Skin Health':
+    elif health_objective == 'Skin Health':
         preferred_foods = preferred_foods[(preferred_foods['Vitamin A'] > 50) & (preferred_foods['Vitamin C'] > 50)]
-    elif user_profile.Health_Objectives == 'Immune system support':
+    elif health_objective == 'Immune system support':
         preferred_foods = preferred_foods[(preferred_foods['Vitamin A'] > 50) & (preferred_foods['Vitamin C'] > 50)]
-    elif user_profile.Health_Objectives == 'Bone Health':
+    elif health_objective == 'Bone Health':
         preferred_foods = preferred_foods[preferred_foods['Calcium'] > 4]
-    elif user_profile.Health_Objectives == 'Eye Health':
+    elif health_objective == 'Eye Health':
         preferred_foods = preferred_foods[preferred_foods['Vitamin A'] > 150]
-    elif user_profile.Health_Objectives == 'Joint Health':
+    elif health_objective == 'Joint Health':
         preferred_foods = preferred_foods[preferred_foods['Vitamin C'] > 100]
-    elif user_profile.Health_Objectives == 'Brain Health':
+    elif health_objective == 'Brain Health':
         preferred_foods = preferred_foods[preferred_foods['Vitamin C'] > 200]
-    elif user_profile.Health_Objectives == 'Muscle Gain':
+    elif health_objective == 'Muscle Gain':
         preferred_foods = preferred_foods[preferred_foods['Protein'] > 2]
 
     return preferred_foods
+
 
 
 
@@ -95,24 +99,29 @@ def recommend_foods(user_profile, main_df, scaler):
     # Get the preferred foods based on the user's profile
     preferred_foods = get_preferred_foods(user_profile, main_df)
     if preferred_foods.empty:
-        return []
+        return pd.DataFrame()  # Return an empty DataFrame if there are no preferred foods
 
     # Keep the original indices of the preferred foods
     original_indices = preferred_foods.index
     print("Original Indices:", original_indices)
+    
     try:
-            # Check the number of samples
+        # Check the number of samples
         n_samples = len(preferred_foods)
         n_neighbors = min(4, n_samples)  # Adjust n_neighbors to be less than or equal to the number of samples
         
         knn = NearestNeighbors(n_neighbors=n_neighbors, metric='euclidean')
-            # Drop non-numeric columns and scale the features
+        
+        # Drop non-numeric columns and scale the features
         preferred_features = preferred_foods.drop(columns=['Food and Serving'])
         scaled_preferred_features = scaler.transform(preferred_features)
-    # Use the mean of the preferred features as the query point
+        
+        # Use the mean of the preferred features as the query point
         query_point = scaled_preferred_features.mean(axis=0).reshape(1, -1)
         print("Query Point:", query_point)
+        
         knn.fit(scaled_preferred_features)
+        
         # Get the nearest neighbors
         distances, indices = knn.kneighbors(query_point)
         print("KNN Returned Indices:", indices)
