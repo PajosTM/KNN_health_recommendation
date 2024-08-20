@@ -101,7 +101,11 @@ def recommend_foods(user_profile, main_df, scaler):
     original_indices = preferred_foods.index
     print("Original Indices:", original_indices)
     try:
-        knn = NearestNeighbors(n_neighbors=4, metric='euclidean')
+            # Check the number of samples
+        n_samples = len(preferred_foods)
+        n_neighbors = min(4, n_samples)  # Adjust n_neighbors to be less than or equal to the number of samples
+        
+        knn = NearestNeighbors(n_neighbors=n_neighbors, metric='euclidean')
             # Drop non-numeric columns and scale the features
         preferred_features = preferred_foods.drop(columns=['Food and Serving'])
         scaled_preferred_features = scaler.transform(preferred_features)
