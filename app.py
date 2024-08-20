@@ -48,8 +48,7 @@ app = FastAPI()
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000/app"], 
-    allow_origins=["https://health-new.onrender.com/recommended"], # Adjust to your needs
+    allow_origins=["http://localhost:3000/app", "https://health-new.onrender.com/recommended"], 
     allow_credentials=True,
     allow_methods=["*"],  # Adjust to your needs
     allow_headers=["*"],  # Adjust to your needs
