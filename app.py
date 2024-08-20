@@ -54,7 +54,7 @@ class UserProfile(BaseModel):
 
 def get_preferred_foods(user_profile, main_df):
     try:
-        disliked_foods = ast.literal_eval(user_profile['Disliked Foods'])
+        disliked_foods = ast.literal_eval(user_profile.Disliked_Foods)
     except (ValueError, SyntaxError) as e:
         logger.error("Error parsing Disliked_Foods: %s", str(e))
         return main_df  # Fallback to returning the full DataFrame
@@ -64,30 +64,31 @@ def get_preferred_foods(user_profile, main_df):
     main_df['Food and Serving'] = main_df['Food and Serving'].str.lower().str.strip()
 
     preferred_foods = main_df[~main_df['Food and Serving'].isin(disliked_foods)]
-    if user_profile['Health Objectives'] == 'Digestive Issues':
+    if user_profile.Health_Objectives == 'Digestive Issues':
         preferred_foods = preferred_foods[preferred_foods['Dietary Fiber'] > 3]
-    elif user_profile['Health Objectives'] == 'High blood pressure':
+    elif user_profile.Health_Objectives == 'High blood pressure':
         preferred_foods = preferred_foods[preferred_foods['Sodium'] > 50]
-    elif user_profile['Health Objectives'] == 'Heart Health':
+    elif user_profile.Health_Objectives == 'Heart Health':
         preferred_foods = preferred_foods[(preferred_foods['Potassium'] > 300) & (preferred_foods['Total Fat'] > 1) ]
-    elif user_profile['Health Objectives'] == 'Weight Loss':
+    elif user_profile.Health_Objectives == 'Weight Loss':
         preferred_foods = preferred_foods[(preferred_foods['Calories'] > 1) & (preferred_foods['Total Fat'] > 0)]
-    elif user_profile['Health Objectives'] == 'Skin Health':
+    elif user_profile.Health_Objectives == 'Skin Health':
         preferred_foods = preferred_foods[(preferred_foods['Vitamin A'] > 50) & (preferred_foods['Vitamin C'] > 50) ]
-    elif user_profile['Health Objectives'] == 'Immune system support':
+    elif user_profile.Health_Objectives == 'Immune system support':
         preferred_foods = preferred_foods[(preferred_foods['Vitamin A'] > 50) & (preferred_foods['Vitamin C'] > 50)]
-    elif user_profile['Health Objectives'] == 'Bone Health':
+    elif user_profile.Health_Objectives == 'Bone Health':
         preferred_foods = preferred_foods[preferred_foods['Calcium'] > 4]
-    elif user_profile['Health Objectives'] == 'Eye Health':
+    elif user_profile.Health_Objectives == 'Eye Health':
         preferred_foods = preferred_foods[preferred_foods['Vitamin A'] > 150]
-    elif user_profile['Health Objectives'] == 'Joint Health':
+    elif user_profile.Health_Objectives == 'Joint Health':
         preferred_foods = preferred_foods[preferred_foods['Vitamin C'] > 100]
-    elif user_profile['Health Objectives'] == 'Brain Health':
+    elif user_profile.Health_Objectives == 'Brain Health':
         preferred_foods = preferred_foods[preferred_foods['Vitamin C'] > 200]
-    elif user_profile['Health Objectives'] == 'Muscle Gain':
+    elif user_profile.Health_Objectives == 'Muscle Gain':
         preferred_foods = preferred_foods[preferred_foods['Protein'] > 2]
 
     return preferred_foods
+
 
 
 def recommend_foods(user_profile, main_df, scaler):
@@ -100,14 +101,14 @@ def recommend_foods(user_profile, main_df, scaler):
     original_indices = preferred_foods.index
     print("Original Indices:", original_indices)
     try:
-        knn = NearestNeighbors(n_neighbors=4, metric='euclidean')
         # Drop non-numeric columns and scale the features
         preferred_features = preferred_foods.drop(columns=['Food and Serving'])
         scaled_preferred_features = scaler.transform(preferred_features)
-    # Use the mean of the preferred features as the query point
+
+        # Use the mean of the preferred features as the query point
         query_point = scaled_preferred_features.mean(axis=0).reshape(1, -1)
         print("Query Point:", query_point)
-        knn.fit(scaled_preferred_features)
+
         # Get the nearest neighbors
         distances, indices = knn.kneighbors(query_point)
         print("KNN Returned Indices:", indices)
@@ -135,6 +136,7 @@ def recommend(user_profile: UserProfile):
     except Exception as e:
         logger.error("Error in recommendation: %s", str(e))
         return {"error": str(e)}
+
 
 
 if __name__ == "__main__":
