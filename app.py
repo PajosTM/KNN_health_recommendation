@@ -48,7 +48,7 @@ app = FastAPI()
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://health-care-app-zeta.vercel.app/app"], 
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],  # Adjust to your needs
     allow_headers=["*"],  # Adjust to your needs
