@@ -5,7 +5,7 @@ import numpy as np
 import pickle
 import ast
 import logging
-
+from fastapi.middleware.cors import CORSMiddleware
 from sklearn.neighbors import NearestNeighbors
 
 # Set up logging
@@ -44,6 +44,16 @@ nutritional_data = nutritional_data.dropna(subset=numeric_columns)
 
 # Define the FastAPI app
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000/app"], 
+    allow_origins=["https://health-new.onrender.com/recommended"], # Adjust to your needs
+    allow_credentials=True,
+    allow_methods=["*"],  # Adjust to your needs
+    allow_headers=["*"],  # Adjust to your needs
+)
 
 
 # Define the request body model
